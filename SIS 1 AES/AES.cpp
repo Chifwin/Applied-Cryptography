@@ -37,6 +37,12 @@ namespace AES {
         Poly& operator-=(Poly a){ return *this = *this - a; }
         Poly& operator*=(Poly a){ return *this = *this * a; }
         explicit operator unsigned char() const { return x; }
+        explicit operator int() const { return x; }
+        friend std::ostream& operator<<(std::ostream& out, Poly a){
+            // Function to cout Poly
+            out << std::hex << (a.x >> 4) << (a.x & 0b1111) << std::dec;
+            return out;
+        }
     };
 
     // Substitution tables
@@ -92,72 +98,76 @@ namespace AES {
         */
         const static int BLOCK_SIDE = 4;
         const static int BLOCK_LEN = 4 * BLOCK_SIDE;
-        using State = std::array<std::array<Poly, Nb>, BLOCK_SIDE>;
-        State round_keys[Nr+1];
+        using Matrix = std::array<std::array<Poly, Nb>, BLOCK_SIDE>;
+        
+        struct State{
+            Matrix state;
 
-        void sub_bytes(State& state){
-            for(auto& row : state){
-                for(Poly& e : row){
-                    e = S_BOX[int(e)];
-                }
-            }
-        }
-
-        void shift_rows(State& state, bool inv){
-            for(int i = 1; i < BLOCK_SIDE; i++){
-                std::rotate(state[i].begin(),
-                            state[i].begin()+(!inv ? i : Nb-i), state[i].end());
-            }
-        }
-
-        void mix_columns(State& state, const Poly mat[Nb][Nb]){
-            State res;
-            for(int i = 0; i < BLOCK_SIDE; i++){
-                for(int j = 0; j < Nb; j++){
-                    for(int k = 0; k < Nb; k++){
-                        res[i][j] += mat[i][k] * state[k][j];
+            State(std::vector<unsigned char>::const_iterator it){
+                for(int j = 0; j < Nb; j++){ // column-wise matrix, so changed order of iterations
+                    for(int i = 0; i < BLOCK_SIDE; i++){
+                        state[i][j] = *(it++);
                     }
                 }
             }
-            state = res;
-        }
-        
-        void add_round_key(State& state, int round_num){
-            for(int i = 0; i < BLOCK_SIDE; i++){
-                for(int j = 0; j < Nb; j++){
-                    state[i][j] += round_keys[round_num][i][j];
-                }
-            }
-        }
 
-        void encrypt_block(State& state){
-            // Round 0
-            add_round_key(state, 0);
-            // Round 1...Nr
-            for(int r = 1; r <= Nr; r++){
-                sub_bytes(state);
-                shift_rows(state, false);
-                if (r != Nr) mix_columns(state, MIX_COL_MAT);
-                add_round_key(state, r);
+            void sub_bytes(){
+                for(auto& row : state){
+                    for(Poly& e : row){
+                        e = S_BOX[int(e)];
+                    }
+                }
             }
-        }
 
-        void copy_from_data(State& state, const std::vector<unsigned char>& data, size_t block_start){
-            for(int i = 0; i < BLOCK_SIDE; i++){
-                for(int j = 0; j < Nb; j++){
-                    size_t ind = block_start + i + j*BLOCK_SIDE;
-                    state[i][j] = data[ind < data.size() ? ind : 0];
+            void shift_rows(bool inv){
+                for(int i = 1; i < BLOCK_SIDE; i++){
+                    std::rotate(state[i].begin(),
+                                state[i].begin()+(!inv ? i : Nb-i), state[i].end());
                 }
             }
-        }
+
+            void mix_columns(const Poly mat[Nb][Nb]){
+                Matrix res;
+                for(int i = 0; i < BLOCK_SIDE; i++){
+                    for(int j = 0; j < Nb; j++){
+                        for(int k = 0; k < Nb; k++){
+                            res[i][j] += mat[i][k] * state[k][j];
+                        }
+                    }
+                }
+                state = res;
+            }
+            
+            void add_round_key(const Matrix& round_key){
+                for(int i = 0; i < BLOCK_SIDE; i++){
+                    for(int j = 0; j < Nb; j++){
+                        state[i][j] += round_key[i][j];
+                    }
+                }
+            }
         
-        void copy_from_state(State& state, std::vector<unsigned char>& res, size_t block_start){
-            for(int i = 0; i < BLOCK_SIDE; i++){
-                for(int j = 0; j < Nb; j++){
-                    res[block_start + i + j*BLOCK_SIDE] = state[i][j];
+            void copy_to(std::vector<unsigned char>::iterator it){
+                for(int j = 0; j < Nb; j++){ // column-wise matrix, so changed order of iterations
+                    for(int i = 0; i < BLOCK_SIDE; i++){
+                        *(it++) = (unsigned char)state[i][j];
+                    }
                 }
             }
-        }
+        
+            void encrypt_block(Matrix round_keys[Nr+1]){
+                // Round 0
+                add_round_key(round_keys[0]);
+                // Round 1...Nr
+                for(int r = 1; r <= Nr; r++){
+                    sub_bytes();
+                    shift_rows(false);
+                    if (r != Nr) mix_columns(MIX_COL_MAT);
+                    add_round_key(round_keys[r]);
+                }
+            }
+        };
+        
+        Matrix round_keys[Nr+1];
 
         void key_expansion128(const std::array<unsigned char, Nk*4>& in_key){
             for(int i = 0; i < BLOCK_SIDE; i++){
@@ -172,7 +182,7 @@ namespace AES {
                 for(int i = 0; i < BLOCK_SIDE; i++){
                     for(int j = 0; j < Nb; j++){
                         if (j == 0){ // to first row add g(round_keys[r-1][i][j])
-                            round_keys[r][i][j] += S_BOX[round_keys[r-1][(i+1)&0b11][3]];
+                            round_keys[r][i][j] += S_BOX[(int)round_keys[r-1][(i+1)&0b11][3]];
                             if (i == 0) round_keys[r][i][j] += round_coef;
                         }else{
                             round_keys[r][i][j] += round_keys[r][i][j-1];
@@ -182,7 +192,7 @@ namespace AES {
                 round_coef *= Poly(2); // multiply by x
             }
         }
-        
+
         void key_expansion192(const std::array<unsigned char, Nk*4>& in_key){
             throw std::logic_error("Function not yet implemented");
         }
@@ -209,12 +219,13 @@ namespace AES {
 
         std::vector<unsigned char> encrypt(const std::vector<unsigned char>& data){
             const size_t n_block = (data.size() + BLOCK_LEN - 1) / BLOCK_LEN; // ceil division
-            std::vector<unsigned char> res(n_block * BLOCK_LEN);
-            for(size_t block = 0; block < n_block; block++){
-                State state;
-                copy_from_data(state, data, block*BLOCK_LEN);
-                encrypt_block(state);
-                copy_from_state(state, res, block*BLOCK_LEN);
+            std::vector<unsigned char> res(n_block * BLOCK_LEN, 0);
+            std::copy(data.begin(), data.end(), res.begin());
+
+            for(auto it = res.begin(); it != res.end(); it += BLOCK_LEN){
+                State state(it);
+                state.encrypt_block(round_keys);
+                state.copy_to(it);
             }
             return res;
         }

@@ -4,9 +4,8 @@
 
 using namespace std;
 
-char h[17] = "0123456789abcdef";
 void phex(unsigned char x){
-    cout << h[x>>4] << h[x&15];
+    cout << hex << (x>>4) << (x&15) << dec;
 }
 
 int main(){
@@ -16,11 +15,10 @@ int main(){
     array<unsigned char, 16> key;
     for(int i = 0; i < 16; i++) key[i] = skey[i];
 
-    AES::AES128 aes(key);
-    auto res = aes.encrypt(data);
-    for(auto x : data) phex(x); cout << '\n';
-    for(auto x : key) phex(x); cout << '\n';
-    for(auto x : res) phex(x); cout << '\n';
+    auto res = AES::AES128(key).encrypt(data);
+    cout << "Data:   "; for(auto x : data) phex(x); cout << '\n';
+    cout << "Key:    "; for(auto x : key) phex(x); cout << '\n';
+    cout << "Result: "; for(auto x : res) phex(x); cout << '\n';
 
     return 0;
 }
