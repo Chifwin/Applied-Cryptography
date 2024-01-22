@@ -36,7 +36,7 @@ namespace AES {
         Poly& operator+=(Poly a){ return *this = *this + a; }
         Poly& operator-=(Poly a){ return *this = *this - a; }
         Poly& operator*=(Poly a){ return *this = *this * a; }
-        operator unsigned char() const { return x; }
+        explicit operator unsigned char() const { return x; }
     };
 
     // Substitution tables
@@ -98,7 +98,7 @@ namespace AES {
         void sub_bytes(State& state){
             for(auto& row : state){
                 for(Poly& e : row){
-                    e = S_BOX[e];
+                    e = S_BOX[int(e)];
                 }
             }
         }
