@@ -40,7 +40,8 @@ namespace AES {
         explicit operator int() const { return x; }
         friend std::ostream& operator<<(std::ostream& out, Poly a){
             // Function to cout Poly
-            out << std::hex << (a.x >> 4) << (a.x & 0b1111) << std::dec;
+            const static char hex[] = "0123456789ABCDEF";
+            out << hex[a.x >> 4] << hex[a.x & 0b1111];
             return out;
         }
     };

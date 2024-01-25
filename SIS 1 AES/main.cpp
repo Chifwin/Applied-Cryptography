@@ -9,7 +9,7 @@ void phex(unsigned char x){
 }
 
 int main(){
-    string sdata = "da1s21asd4a6s5d4as87d98ad465465;15465op46[51;l2/13.2,1/32/.4l654;l4;l;9l8;79l8;42d13as1d32asd5a]";
+    string sdata = "1";
     vector<unsigned char> data(sdata.begin(), sdata.end());
     string skey = "1a3d2sa1d3a4sd64";
     array<unsigned char, 16> key;
