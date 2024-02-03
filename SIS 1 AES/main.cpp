@@ -30,7 +30,7 @@ int main(int argc, char* argv[]){
 
     string skey = argv[3];
     array<unsigned char, 16> key;
-    for(int i = 0; i < 16 && i < skey.size(); i++) {
+    for(int i = 0; i < 16 && i < (int)skey.size(); i++) {
         key[i] = skey[i];
     }
 

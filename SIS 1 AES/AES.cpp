@@ -1,6 +1,7 @@
 #pragma once
 
 #include <algorithm>
+#include <iostream>
 #include <vector>
 #include <array>
 
@@ -15,10 +16,11 @@ namespace AES {
         const static unsigned char P = 0b0001'1011; // Reduced P(x) - without x^8
     public:
         Poly(): x(0) {}
-        Poly(unsigned char _x): x(_x) {}
-        friend Poly operator+(Poly a, Poly b){ return a.x^b.x; }
-        friend Poly operator-(Poly a, Poly b){ return a.x^b.x; }
-        friend Poly operator*(Poly a, Poly b){
+        constexpr Poly(unsigned char _x): x(_x) {}
+
+        constexpr friend Poly operator+(Poly a, Poly b){ return a.x^b.x; }
+        constexpr friend Poly operator-(Poly a, Poly b){ return a.x^b.x; }
+        constexpr friend Poly operator*(Poly a, Poly b){
             unsigned char res = 0;
             while(b.x){
                 if (b.x & 1) // if coefficient at x^0 active, we need to add a to result
@@ -33,11 +35,26 @@ namespace AES {
             }
             return res;
         }
-        Poly& operator+=(Poly a){ return *this = *this + a; }
-        Poly& operator-=(Poly a){ return *this = *this - a; }
-        Poly& operator*=(Poly a){ return *this = *this * a; }
-        explicit operator unsigned char() const { return x; }
-        explicit operator int() const { return x; }
+
+        constexpr Poly& operator+=(Poly a){ return *this = *this + a; }
+        constexpr Poly& operator-=(Poly a){ return *this = *this - a; }
+        constexpr Poly& operator*=(Poly a){ return *this = *this * a; }
+        constexpr bool  operator!=(Poly a){ return this->x != a.x; }
+
+        constexpr Poly inv(){
+            if (this->x == 0) return 0;
+            // Naive method for finding inverse in field
+            for(Poly pos(255); pos.x > 0; pos.x--){
+                if ((pos * *this).x == 1){
+                    return pos;
+                }
+            }
+            throw std::logic_error("Inverse must exist for " + std::to_string(int(this->x)) + "!\n");
+        }
+
+        constexpr explicit operator unsigned char() const { return x; }
+        constexpr explicit operator int() const { return x; }
+
         friend std::ostream& operator<<(std::ostream& out, Poly a){
             // Function to cout Poly
             const static char hex[] = "0123456789ABCDEF";
@@ -47,7 +64,7 @@ namespace AES {
     };
 
     // Substitution tables
-    const Poly S_BOX[256] = {
+    constexpr Poly S_BOX[256] = {
         0x63, 0x7c, 0x77, 0x7b, 0xf2, 0x6b, 0x6f, 0xc5, 0x30, 0x01, 0x67, 0x2b, 0xfe, 0xd7, 0xab, 0x76,
         0xca, 0x82, 0xc9, 0x7d, 0xfa, 0x59, 0x47, 0xf0, 0xad, 0xd4, 0xa2, 0xaf, 0x9c, 0xa4, 0x72, 0xc0,
         0xb7, 0xfd, 0x93, 0x26, 0x36, 0x3f, 0xf7, 0xcc, 0x34, 0xa5, 0xe5, 0xf1, 0x71, 0xd8, 0x31, 0x15,
@@ -66,7 +83,7 @@ namespace AES {
         0x8c, 0xa1, 0x89, 0x0d, 0xbf, 0xe6, 0x42, 0x68, 0x41, 0x99, 0x2d, 0x0f, 0xb0, 0x54, 0xbb, 0x16
     };
     
-    const Poly INV_S_BOX[256] = {
+    constexpr Poly INV_S_BOX[256] = {
         0x52, 0x09, 0x6a, 0xd5, 0x30, 0x36, 0xa5, 0x38, 0xbf, 0x40, 0xa3, 0x9e, 0x81, 0xf3, 0xd7, 0xfb,
         0x7c, 0xe3, 0x39, 0x82, 0x9b, 0x2f, 0xff, 0x87, 0x34, 0x8e, 0x43, 0x44, 0xc4, 0xde, 0xe9, 0xcb,
         0x54, 0x7b, 0x94, 0x32, 0xa6, 0xc2, 0x23, 0x3d, 0xee, 0x4c, 0x95, 0x0b, 0x42, 0xfa, 0xc3, 0x4e,
@@ -89,6 +106,58 @@ namespace AES {
     const Poly MIX_COL_MAT[4][4] = {{2, 3, 1, 1}, {1, 2, 3, 1}, {1, 1, 2, 3}, {3, 1, 1, 2}};
 
     const Poly INV_MIX_COL_MAT[4][4] = {{14, 11, 13, 9}, {9, 14, 11, 13}, {13, 9, 14, 11}, {11, 13, 9, 14}};
+
+    constexpr Poly get_S_box_value(unsigned char ind){
+        const unsigned char matrix[8] = {
+            0b1111'0001,
+            0b1110'0011,
+            0b1100'0111,
+            0b1000'1111,
+            0b0001'1111,
+            0b0011'1110,
+            0b0111'1100,
+            0b1111'1000,
+        };
+        const unsigned char add_vector = 0b0110'0011;
+
+        unsigned char inverse = (unsigned char)(Poly(ind).inv());
+        unsigned char result = 0;
+        for(int i = 0; i < 8; i++){
+            unsigned char row = matrix[i] & inverse;
+            /*
+                As we have bit matrix-vector multiplication, we should do addition in GF(2),
+                simply result[i] = cound_1_bits(row)%2
+            */
+            for(int j = 0; j < 8; j++){
+                if (row & (1 << j)) result ^= (1 << i);
+            }
+        }
+        result ^= add_vector;
+        return result;
+    }
+
+    constexpr bool check_S_box(){
+        for (unsigned char ind = 0; ; ind++){
+            Poly need = get_S_box_value(ind);
+            if (need != S_BOX[ind]) {
+                return false;
+            }
+            if (ind == 255) break;
+        }
+        for (unsigned char ind = 0; ; ind++){
+            /*
+                As inverse S-box is simply inverse permutation of 
+                the original S-box, we can check it in the following way.
+            */
+            if (Poly(ind) != S_BOX[(int)INV_S_BOX[ind]]) {
+                return false;
+            }
+            if (ind == 255) break;
+        }
+        return true;
+    }
+
+    static_assert(check_S_box());
 
     template<int Nk, int Nr, int Nb=4>
     class Rijndael{
@@ -194,16 +263,17 @@ namespace AES {
             }
         }
 
-        void key_expansion192(const std::array<unsigned char, Nk*4>& in_key){
+        void key_expansion192([[maybe_unused]]const std::array<unsigned char, Nk*4>& in_key){
             throw std::logic_error("Function not yet implemented");
         }
         
-        void key_expansion256(const std::array<unsigned char, Nk*4>& in_key){
+        void key_expansion256([[maybe_unused]]const std::array<unsigned char, Nk*4>& in_key){
             throw std::logic_error("Function not yet implemented");
         }
 
     public:
         Rijndael(const std::array<unsigned char, Nk*4>& in_key){
+            check_S_box();
             static_assert(Nk == 4 || Nk == 6 || Nk == 8);
             switch (Nk){
                 case 4:
