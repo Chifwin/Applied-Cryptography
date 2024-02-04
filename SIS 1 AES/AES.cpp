@@ -273,7 +273,6 @@ namespace AES {
 
     public:
         Rijndael(const std::array<unsigned char, Nk*4>& in_key){
-            check_S_box();
             static_assert(Nk == 4 || Nk == 6 || Nk == 8);
             switch (Nk){
                 case 4:
