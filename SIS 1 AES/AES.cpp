@@ -49,7 +49,7 @@ namespace AES {
                     return pos;
                 }
             }
-            throw std::logic_error("Inverse must exist for " + std::to_string(int(this->x)) + "!\n");
+            return 0;
         }
 
         constexpr explicit operator unsigned char() const { return x; }
@@ -140,6 +140,7 @@ namespace AES {
         for (unsigned char ind = 0; ; ind++){
             Poly need = get_S_box_value(ind);
             if (need != S_BOX[ind]) {
+                std::cerr << ind << ' ' << need << ' ' << S_BOX[ind] << '\n';
                 return false;
             }
             if (ind == 255) break;
@@ -166,8 +167,8 @@ namespace AES {
             Nk - number of 32-bit words in key
             Nr - number of rounds in algorithm
         */
-        const static int BLOCK_SIDE = 4;
-        const static int BLOCK_LEN = 4 * BLOCK_SIDE;
+        constexpr static int BLOCK_SIDE = 4;
+        constexpr static int BLOCK_LEN = 4 * BLOCK_SIDE;
         using Matrix = std::array<std::array<Poly, Nb>, BLOCK_SIDE>;
         
         struct State{
@@ -185,6 +186,13 @@ namespace AES {
                 for(auto& row : state){
                     for(Poly& e : row){
                         e = S_BOX[int(e)];
+                    }
+                }
+            }
+            void inv_sub_bytes(){
+                for(auto& row : state){
+                    for(Poly& e : row){
+                        e = INV_S_BOX[int(e)];
                     }
                 }
             }
@@ -234,6 +242,22 @@ namespace AES {
                     if (r != Nr) mix_columns(MIX_COL_MAT);
                     add_round_key(round_keys[r]);
                 }
+            }
+
+            void decrypt_block(Matrix round_keys[Nr+1]){
+                //Round Nr
+                add_round_key(round_keys[Nr]);
+                // Round Nr-1 to 1
+                for(int r = Nr-1; r >= 1; r--){
+                    shift_rows(true);
+                    inv_sub_bytes();
+                    add_round_key(round_keys[r]);
+                    if(r != Nr) mix_columns(INV_MIX_COL_MAT);
+                }
+                // Round 0
+                shift_rows(true);
+                inv_sub_bytes();
+                add_round_key(round_keys[0]);
             }
         };
         
@@ -295,6 +319,19 @@ namespace AES {
             for(auto it = res.begin(); it != res.end(); it += BLOCK_LEN){
                 State state(it);
                 state.encrypt_block(round_keys);
+                state.copy_to(it);
+            }
+            return res;
+        }
+        
+        std::vector<unsigned char> decrypt(const std::vector<unsigned char>& data){
+            const size_t n_block = (data.size() + BLOCK_LEN - 1) / BLOCK_LEN; // ceil division
+            std::vector<unsigned char> res(n_block * BLOCK_LEN, 0);
+            std::copy(data.begin(), data.end(), res.begin());
+
+            for(auto it = res.begin(); it != res.end(); it += BLOCK_LEN){
+                State state(it);
+                state.decrypt_block(round_keys);
                 state.copy_to(it);
             }
             return res;
