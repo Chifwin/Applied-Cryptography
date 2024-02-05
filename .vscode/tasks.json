@@ -4,7 +4,9 @@
         {
             "type": "shell",
             "label": "Compile&Run",
-            "command":["g++.exe"],
+            "command": [
+                "g++.exe"
+            ],
             "args": [
                 "-std=c++17",
                 "${file}",
@@ -22,15 +24,12 @@
                 "-Wcast-qual",
                 "-Wcast-align",
                 "-D_GLIBCXX_DEBUG",
-                "-D_GLIBCXX_DEBUG_PEDANTIC",
+                "-D_GLIBCXX_DEBUG_PEDANTIC"
             ],
             "problemMatcher": [
                 "$gcc"
             ],
-            "group": {
-                "kind": "build",
-                "isDefault": true
-            }
+            "group": "build"
         }
     ]
 }
