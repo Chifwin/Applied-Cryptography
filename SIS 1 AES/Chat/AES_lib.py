@@ -32,6 +32,11 @@ class AES128(object):
         fun.argtypes = [C.c_void_p, C.c_char_p, C.c_size_t, C.c_char_p, C.c_size_t]
         self.dec = fun
 
+        fun = lib.AES128_delete
+        fun.restype = None
+        fun.argtypes = [C.c_void_p]
+        self.delet = fun
+
     def encrypt(self, text):
         """
             text - bytes object only
@@ -51,3 +56,7 @@ class AES128(object):
         res = C.create_string_buffer(text_len)
         self.dec(self.obj, chifertext, chifertext_len, res, text_len)
         return res.raw
+
+
+    def __del__(self):
+        self.delet(self.obj)

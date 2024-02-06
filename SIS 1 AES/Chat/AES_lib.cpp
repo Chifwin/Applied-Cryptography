@@ -18,9 +18,14 @@ extern "C" {
         std::vector<unsigned char> chifertext = self->encrypt(text);
         std::copy(chifertext.begin(), chifertext.end(), res);
     }
+    
     void DLL_EXPORT WINAPI AES128_decrypt(AES::AES128* self, char *data, size_t len, char *res, size_t text_len){
         std::vector<unsigned char> chifertext(data, data + len);
         std::vector<unsigned char> text = self->decrypt(chifertext);
         std::copy(text.begin(), text.begin() + text_len, res);
+    }
+
+    void DLL_EXPORT WINAPI AES128_delete(AES::AES128* self){
+        delete self;
     }
 }

@@ -3,3 +3,4 @@
 *.jpg
 2
 *\__pycache__
+*.dll

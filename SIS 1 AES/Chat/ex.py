@@ -10,3 +10,9 @@ text = aes.decrypt(chifertext, len(sb)).decode() # len(sb), not len(s) - importa
 print("s          =", s)
 print("chifertext =", chifertext)
 print("text       =", text)
+
+
+# test memory leaks
+# good if in task manager Python don't use increasing memory space
+while True:
+    AES128(gen_key())
