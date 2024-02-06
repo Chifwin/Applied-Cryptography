@@ -48,7 +48,7 @@ int main(int argc, char* argv[]){
             key[i] = distrib(gen);
         }
 
-        ofstream outputFile("key.txt");
+        ofstream outputFile("key.txt", ios::binary);
         if (!outputFile) {
             cerr << "Error: Unable to open output file." << endl;
             return 1;
