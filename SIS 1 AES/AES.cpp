@@ -168,7 +168,8 @@ namespace AES {
             Nr - number of rounds in algorithm
         */
         constexpr static int BLOCK_SIDE = 4;
-        constexpr static int BLOCK_LEN = 4 * BLOCK_SIDE;
+        constexpr static int BLOCK_LEN  = Nb * BLOCK_SIDE;
+        constexpr static int KEY_LEN    = Nk * BLOCK_SIDE;
         using Matrix = std::array<std::array<Poly, Nb>, BLOCK_SIDE>;
         
         struct State{
@@ -263,52 +264,53 @@ namespace AES {
         
         Matrix round_keys[Nr+1];
 
-        void key_expansion128(const std::array<unsigned char, Nk*4>& in_key){
-            for(int i = 0; i < BLOCK_SIDE; i++){
-                for(int j = 0; j < Nb; j++){
-                    round_keys[0][i][j] = in_key[i + j*BLOCK_SIDE]; // bytes in keys and states arranged in columns
-                }
+        void key_expansion(const std::array<unsigned char, KEY_LEN>& in_key){
+            std::array<Poly, (Nr + 1) * BLOCK_LEN> w;
+            // Copy main key
+            for(int i = 0; i < KEY_LEN; i++){
+                w[i] = in_key[i];
             }
-            Poly round_coef(1);
-            for(int r = 1; r <= Nr; r++){
-                round_keys[r] = round_keys[r-1];
 
-                for(int i = 0; i < BLOCK_SIDE; i++){
-                    for(int j = 0; j < Nb; j++){
-                        if (j == 0){ // to first row add g(round_keys[r-1][i][j])
-                            round_keys[r][i][j] += S_BOX[(int)round_keys[r-1][(i+1)&0b11][3]];
-                            if (i == 0) round_keys[r][i][j] += round_coef;
-                        }else{
-                            round_keys[r][i][j] += round_keys[r][i][j-1];
-                        }
+            Poly round_coef(1);
+            for(int i = KEY_LEN; i < (int)w.size(); i += BLOCK_SIDE){
+                std::array<Poly, BLOCK_SIDE> add;
+                for(int j = 0; j < BLOCK_SIDE; j++){
+                    add[j] = w[i + j - BLOCK_SIDE];
+                }
+
+                if (i % KEY_LEN == 0){
+                    // g-function
+                    std::rotate(add.begin(), add.begin()+1, add.end());
+                    for(int j = 0; j < 4; j++){
+                        add[j] = S_BOX[(int)add[j]];
+                    }
+                    add[0] += round_coef;
+                    round_coef *= Poly(2); // multiply by x
+                }else if (Nk > 6 && i % KEY_LEN == 4){
+                    // h-function
+                    for(int j = 0; j < BLOCK_SIDE; j++){
+                        add[j] = S_BOX[(int)add[j]];
                     }
                 }
-                round_coef *= Poly(2); // multiply by x
-            }
-        }
 
-        void key_expansion192([[maybe_unused]]const std::array<unsigned char, Nk*4>& in_key){
-            throw std::logic_error("Function not yet implemented");
-        }
-        
-        void key_expansion256([[maybe_unused]]const std::array<unsigned char, Nk*4>& in_key){
-            throw std::logic_error("Function not yet implemented");
+                for(int j = 0; j < BLOCK_SIDE; j++){
+                    w[i + j] = w[i + j - KEY_LEN] + add[j];
+                }
+            }
+            for(int k = 0; k <= Nr; k++){
+                for(int i = 0; i < BLOCK_SIDE; i++){
+                    for(int j = 0; j < Nb; j++){
+                        // bytes in keys arranged in column order
+                        round_keys[k][i][j] = w[k*BLOCK_LEN + i + j*BLOCK_SIDE];
+                    }
+                }
+            }
         }
 
     public:
         Rijndael(const std::array<unsigned char, Nk*4>& in_key){
             static_assert(Nk == 4 || Nk == 6 || Nk == 8);
-            switch (Nk){
-                case 4:
-                    key_expansion128(in_key);
-                    break;
-                case 6:
-                    key_expansion192(in_key);
-                    break;
-                case 8:
-                    key_expansion256(in_key);
-                    break;
-            }
+            key_expansion(in_key);
         }
 
         std::vector<unsigned char> encrypt(const std::vector<unsigned char>& data){
