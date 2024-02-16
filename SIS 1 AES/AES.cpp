@@ -286,7 +286,7 @@ namespace AES {
                     }
                     add[0] += round_coef;
                     round_coef *= Poly(2); // multiply by x
-                }else if (Nk > 6 && i % KEY_LEN == 4){
+                }else if (Nk > 6 && i % KEY_LEN == 16){
                     // h-function
                     for(int j = 0; j < BLOCK_SIDE; j++){
                         add[j] = S_BOX[(int)add[j]];
