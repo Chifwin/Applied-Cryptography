@@ -1,7 +1,7 @@
-import sys
-import time
 import socket
 import threading
+import sys
+import time
 
 from AES_lib import *
 
@@ -14,14 +14,14 @@ server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 server.bind((host, port))
 server.listen()
 
+stop = False
+
 # Lists For Clients and Their Nicknames
 clients = {}
 nicknames = []
 
-stop = False
-
 def gen_key_for_client():
-    return AES128(gen_key())
+    return gen_key()
 
 # Sending Messages To All Connected Clients
 def broadcast(message):
@@ -60,7 +60,8 @@ def receive():
         # Request And Store Nickname
         client.send('NICK'.encode('utf-8'))
         key_of_client = gen_key_for_client()
-        client.send(key_of_client.to_bytes())
+        byte_key = bytes(x for x in key_of_client)
+        client.send(byte_key)
 
         #    !!!  check if there exists user with that name
         nickname = client.recv(1024)
@@ -90,4 +91,3 @@ except KeyboardInterrupt:
     print("quitting")
     stop = True
     sys.exit()
-    
