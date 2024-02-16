@@ -1,9 +1,8 @@
-import sys
-import time
 import socket
 import threading
-
 from AES_lib import *
+import sys
+import time
 
 # Choosing Nickname
 nickname = input("Choose your nickname: ")
@@ -17,7 +16,6 @@ client.connect(('127.0.0.1', 55555))
 
 # Listening to Server and Sending Nickname
 def receive():
-    # while not stop:
     while not stop:
         try:
             # Receive Message From Server
@@ -26,7 +24,7 @@ def receive():
             # If message is 'NICK', then  send Nickname
             if message.decode('utf-8') == 'NICK': 
                 global key
-                key = client.recv(1024).from_bytes()
+                key = client.recv(1024)
                 global aes
                 aes = AES128(key)
                 pre_message = len(nickname).to_bytes(64, 'little') + bytes(nickname, 'utf-8')
@@ -44,9 +42,15 @@ def receive():
 # Sending Messages To Server
 def write():
     while not stop:
-        message = '{}: {}'.format(nickname, input(''))
-        pre_message = len(message).to_bytes(64, 'little') + bytes(message, 'utf-8')
-        client.send(aes.encrypt(pre_message))
+        try: 
+            message = '{}: {}'.format(nickname, input(''))
+            pre_message = len(message).to_bytes(64, 'little') + bytes(message, 'utf-8')
+            client.send(aes.encrypt(pre_message))
+        except KeyboardInterrupt: 
+                print("quitting")
+                stop = True
+                sys.exit()
+
 
 # Starting Threads For Listening And Writing
 receive_thread = threading.Thread(target=receive)
@@ -55,6 +59,7 @@ receive_thread.start()
 write_thread = threading.Thread(target=write)
 write_thread.start()
 
+
 try:
     while True:
         time.sleep(1)
@@ -62,10 +67,4 @@ except KeyboardInterrupt:
     print("quitting")
     stop = True
     sys.exit()
-    
-
-
-# int.from_bytes(g[:64], 'little')
-# g = len(s).to_bytes(64, 'little') + bytes(s, 'utf-8')
-# aes.decrypt(g[64:], int.from_bytes(g[:64], 'little'))
 
