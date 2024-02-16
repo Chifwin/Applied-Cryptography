@@ -9,9 +9,13 @@ AES_KEY_LEN = 16
 AES_BLOCK_LEN = 16
 
 def gen_key(key = None):
+    '''
+        If key == None: generate new key
+        else: set key values from list[int]
+    '''
     res = (C.c_ubyte * AES_KEY_LEN)()
     for i in range(AES_KEY_LEN):
-        res[i] = (randint(0, 255) if key == None else ord(key[i]))
+        res[i] = (randint(0, 255) if key == None else key[i])
     return res
 
 
@@ -56,7 +60,6 @@ class AES128(object):
         res = C.create_string_buffer(text_len)
         self.dec(self.obj, chifertext, chifertext_len, res, text_len)
         return res.raw
-
 
     def __del__(self):
         self.delet(self.obj)

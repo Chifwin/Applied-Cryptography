@@ -3,50 +3,47 @@ import threading
 import sys
 import time
 
-from AES_lib import *
+from AES_lib import gen_key
+from client import Client
 
-# Connection Data
-host = '127.0.0.1'
-port = 55555
+server_sock = ['0.0.0.0', 55555]
+
+if len(sys.argv) > 2:
+    server_sock[1] = sys.argv[1]
+if len(sys.argv) > 2:
+    server_sock[2] = int(sys.argv[2])
 
 # Starting Server
 server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-server.bind((host, port))
+server.bind(tuple(server_sock))
 server.listen()
 
 stop = False
 
-# Lists For Clients and Their Nicknames
-clients = {}
-nicknames = []
-
-def gen_key_for_client():
-    return gen_key()
+# Lists For Clients and 
+clients = []
 
 # Sending Messages To All Connected Clients
-def broadcast(message):
+def broadcast(message, sender):
     for client in clients:
-        aes = AES128(clients[client])
-        pre_message = len(message).to_bytes(64, 'little') + bytes(message, 'utf-8')
-        client.send(aes.encrypt(pre_message))
+        if client != sender:
+            client.send(message)
 
 # Handling Messages From encrypt
-def handle(client):
+def handle(client: Client):
+    client.key_exchange()
+    client.set_nickname(client.recv())
+    broadcast(f"{client.nick} was joined!", client)
     while not stop:
         try:
             # Broadcasting Messages
-            message = client.recv(1024)
-            aes = AES128(clients[client])
-            message = aes.decrypt(message[64:], int.from_bytes(message[:64], 'little')).decode()
-            broadcast(message)
+            message = client.recv()
+            broadcast(f"{client.nick}: {message}", client)
         except:
-            # Removing And Closing Clients
-            index = clients.keys().index(client)
-            clients.pop(client)
+            # Removing And Closing Client
+            clients.pop(clients.index(client))
             client.close()
-            nickname = nicknames[index]
-            broadcast('{} left!'.format(nickname))
-            nicknames.remove(nickname)
+            broadcast(f'{client.nick} left!', client)
             break
 
 
@@ -54,28 +51,12 @@ def handle(client):
 def receive():
     while not stop:
         # Accept Connection
-        client, address = server.accept()
-        print("Connected with {}".format(str(address)))
+        sock, address = server.accept()
+        print(f"Connected with {address}")
 
-        # Request And Store Nickname
-        client.send('NICK'.encode('utf-8'))
-        key_of_client = gen_key_for_client()
-        byte_key = bytes(x for x in key_of_client)
-        client.send(byte_key)
-
-        #    !!!  check if there exists user with that name
-        nickname = client.recv(1024)
-        aes_client = AES128(key_of_client)
-        nickname = aes_client.decrypt(nickname[64:], int.from_bytes(nickname[:64], 'little')).decode()
-
-        nicknames.append(nickname)
-        clients[client] = key_of_client
-
-        # Print And Broadcast Nickname
-        print("Nickname is {}".format(nickname))
-        broadcast("{} joined!".format(nickname))
-        pre_message = len('Connected to server!').to_bytes(64, 'little') + bytes('Connected to server!', 'utf-8')
-        client.send(aes_client.encrypt(pre_message))
+        # create client with new key
+        client = Client(gen_key(), sock)
+        clients.append(client)
 
         # Start Handling Thread For Client
         thread = threading.Thread(target=handle, args=(client,))
