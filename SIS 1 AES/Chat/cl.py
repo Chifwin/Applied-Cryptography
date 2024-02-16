@@ -1,5 +1,8 @@
+import sys
+import time
 import socket
 import threading
+
 from AES_lib import *
 
 # Choosing Nickname
@@ -15,7 +18,7 @@ client.connect(('127.0.0.1', 55555))
 # Listening to Server and Sending Nickname
 def receive():
     # while not stop:
-    while True:
+    while not stop:
         try:
             # Receive Message From Server
             message = client.recv(1024)
@@ -40,7 +43,7 @@ def receive():
 
 # Sending Messages To Server
 def write():
-    while True:
+    while not stop:
         message = '{}: {}'.format(nickname, input(''))
         pre_message = len(message).to_bytes(64, 'little') + bytes(message, 'utf-8')
         client.send(aes.encrypt(pre_message))
@@ -52,15 +55,14 @@ receive_thread.start()
 write_thread = threading.Thread(target=write)
 write_thread.start()
 
-
-# while True:
-#     try:
-#         time.sleep(1)
-#     except KeyboardInterrupt:
-#         print("quitting")
-#         sys.exit()
-
-
+try:
+    while True:
+        time.sleep(1)
+except KeyboardInterrupt:
+    print("quitting")
+    stop = True
+    sys.exit()
+    
 
 
 # int.from_bytes(g[:64], 'little')

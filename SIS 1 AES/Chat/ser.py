@@ -1,3 +1,5 @@
+import sys
+import time
 import socket
 import threading
 
@@ -16,6 +18,8 @@ server.listen()
 clients = {}
 nicknames = []
 
+stop = False
+
 def gen_key_for_client():
     return AES128(gen_key())
 
@@ -28,7 +32,7 @@ def broadcast(message):
 
 # Handling Messages From encrypt
 def handle(client):
-    while True:
+    while not stop:
         try:
             # Broadcasting Messages
             message = client.recv(1024)
@@ -48,7 +52,7 @@ def handle(client):
 
 # Receiving / Listening Function
 def receive():
-    while True:
+    while not stop:
         # Accept Connection
         client, address = server.accept()
         print("Connected with {}".format(str(address)))
@@ -76,4 +80,14 @@ def receive():
         thread = threading.Thread(target=handle, args=(client,))
         thread.start()
 
-receive()
+receive_thread = threading.Thread(target=receive)
+receive_thread.start()
+
+try:
+    while True:
+        time.sleep(1)
+except KeyboardInterrupt:
+    print("quitting")
+    stop = True
+    sys.exit()
+    
