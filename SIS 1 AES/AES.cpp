@@ -160,6 +160,10 @@ namespace AES {
 
     static_assert(check_S_box());
 
+    struct EncryptionMode{
+        
+    };
+
     template<int Nk, int Nr, int Nb=4>
     class Rijndael{
         /*
@@ -183,17 +187,10 @@ namespace AES {
                 }
             }
 
-            void sub_bytes(){
+            void sub_bytes(const Poly s_box[256]){
                 for(auto& row : state){
                     for(Poly& e : row){
-                        e = S_BOX[int(e)];
-                    }
-                }
-            }
-            void inv_sub_bytes(){
-                for(auto& row : state){
-                    for(Poly& e : row){
-                        e = INV_S_BOX[int(e)];
+                        e = s_box[int(e)];
                     }
                 }
             }
@@ -238,7 +235,7 @@ namespace AES {
                 add_round_key(round_keys[0]);
                 // Round 1...Nr
                 for(int r = 1; r <= Nr; r++){
-                    sub_bytes();
+                    sub_bytes(S_BOX);
                     shift_rows(false);
                     if (r != Nr) mix_columns(MIX_COL_MAT);
                     add_round_key(round_keys[r]);
@@ -251,13 +248,13 @@ namespace AES {
                 // Round Nr-1 to 1
                 for(int r = Nr-1; r >= 1; r--){
                     shift_rows(true);
-                    inv_sub_bytes();
+                    sub_bytes(INV_S_BOX);
                     add_round_key(round_keys[r]);
                     if(r != Nr) mix_columns(INV_MIX_COL_MAT);
                 }
                 // Round 0
                 shift_rows(true);
-                inv_sub_bytes();
+                sub_bytes(INV_S_BOX);
                 add_round_key(round_keys[0]);
             }
         };
@@ -314,8 +311,10 @@ namespace AES {
         }
 
         std::vector<unsigned char> encrypt(const std::vector<unsigned char>& data){
-            const size_t n_block = (data.size() + BLOCK_LEN - 1) / BLOCK_LEN; // ceil division
-            std::vector<unsigned char> res(n_block * BLOCK_LEN, 0);
+            // Always add padding to the plaintext
+            // Padding scheme - PKCS#7: add n bytes of value n
+            const size_t res_len = (data.size()/BLOCK_LEN + 1) * BLOCK_LEN; 
+            std::vector<unsigned char> res(res_len, res_len - data.size());
             std::copy(data.begin(), data.end(), res.begin());
 
             for(auto it = res.begin(); it != res.end(); it += BLOCK_LEN){
@@ -336,6 +335,8 @@ namespace AES {
                 state.decrypt_block(round_keys);
                 state.copy_to(it);
             }
+            // As we use PKCS#7, we know lenght of padding - value of last byte
+            res.resize(res.size() - res.back());
             return res;
         }
     };

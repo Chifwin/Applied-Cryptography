@@ -33,7 +33,7 @@ class AES128(object):
 
         fun = lib.AES128_decrypt
         fun.restype = None
-        fun.argtypes = [C.c_void_p, C.c_char_p, C.c_size_t, C.c_char_p, C.c_size_t]
+        fun.argtypes = [C.c_void_p, C.c_char_p, C.c_size_t, C.c_char_p]
         self.dec = fun
 
         fun = lib.AES128_delete
@@ -51,14 +51,13 @@ class AES128(object):
         self.enc(self.obj, text, text_len, res)
         return res.raw
     
-    def decrypt(self, chifertext, text_len):
+    def decrypt(self, chifertext):
         """
             chifertext - bytes object to  decrypt
-            text_len - len of bytes object of original text, not str - important for non-ASCII strings
         """
         chifertext_len = len(chifertext)
-        res = C.create_string_buffer(text_len)
-        self.dec(self.obj, chifertext, chifertext_len, res, text_len)
+        res = C.create_string_buffer(len(chifertext))
+        self.dec(self.obj, chifertext, chifertext_len, res)
         return res.raw
 
     def __del__(self):

@@ -19,10 +19,10 @@ extern "C" {
         std::copy(chifertext.begin(), chifertext.end(), res);
     }
     
-    void DLL_EXPORT WINAPI AES128_decrypt(AES::AES128* self, char *data, size_t len, char *res, size_t text_len){
+    void DLL_EXPORT WINAPI AES128_decrypt(AES::AES128* self, char *data, size_t len, char *res){
         std::vector<unsigned char> chifertext(data, data + len);
         std::vector<unsigned char> text = self->decrypt(chifertext);
-        std::copy(text.begin(), text.begin() + text_len, res);
+        std::copy(text.begin(), text.end(), res);
     }
 
     void DLL_EXPORT WINAPI AES128_delete(AES::AES128* self){

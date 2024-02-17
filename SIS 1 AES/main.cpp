@@ -54,9 +54,6 @@ int main(int argc, char* argv[]){
             return 1;
         }
         outputFile.write(reinterpret_cast<const char*>(key.data()), key.size());
-        size_t data_size = data.size();
-        cout << "DATA SIZE: " << data_size << '\n';
-        outputFile.write(reinterpret_cast<const char*>(&data_size), sizeof(data_size));
         outputFile.close();
 
         // Encryption
@@ -71,14 +68,10 @@ int main(int argc, char* argv[]){
         }
         
         inputFile.read(reinterpret_cast<char*>(key.data()), key.size());
-        size_t data_size = 0;
-        inputFile.read(reinterpret_cast<char*>(&data_size), sizeof(data_size));
-        cout << "DATA SIZE: " << data_size << '\n';
         inputFile.close();
 
         //Decryption
         res = AES::AES128(key).decrypt(data);
-        res.resize(data_size);
         cout << "Decryption completed successfully." << endl;
     }
 

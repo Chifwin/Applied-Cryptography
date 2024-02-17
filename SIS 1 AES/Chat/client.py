@@ -17,14 +17,13 @@ class Client:
             Encrypt string, using key of client. Lenght of the message is placed before chifertext
         '''
         sb = bytes(text, 'utf-8')
-        return len(sb).to_bytes(8, 'little') + self.aes.encrypt(sb)
+        return self.aes.encrypt(sb)
     
     def decrypt(self, sb: bytes):
         '''
             Decrypt bytes, using key of client, and getting lenght from start of the message
         '''
-        lenght = int.from_bytes(sb[:8], 'little')
-        return str(self.aes.decrypt(sb[8:], lenght), 'utf-8')
+        return str(self.aes.decrypt(sb), 'utf-8')
     
     def send(self, text):
         '''
