@@ -160,10 +160,6 @@ namespace AES {
 
     static_assert(check_S_box());
 
-    struct EncryptionMode{
-        
-    };
-
     template<int Nk, int Nr, int Nb=4>
     class Rijndael{
         /*
