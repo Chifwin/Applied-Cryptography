@@ -32,7 +32,7 @@ def chooseE(totient):
             return e
 
 
-def generate_keys():
+def generate_keys(min_value, max_value):
     """
     Using the prime numbers compute and store 
     the public and private keys in two separate 
@@ -40,13 +40,13 @@ def generate_keys():
     """
 
     # choose two random prime numbers 
-    prime1, prime2 = generate_prime(1000, 5000), generate_prime(1000, 5000)
+    prime1, prime2 = generate_prime(min_value, max_value), generate_prime(min_value, max_value)
     while prime1 == prime2:
-        prime2 = generate_prime(1000, 5000)
+        prime2 = generate_prime(min_value, max_value)
 
     # compute n, totient, e
     n = prime1 * prime2
-    totient = (prime1 - 1) * (prime2 - 1)
+    totient = (prime1 * prime2) // math.gcd(prime1, prime2)
     e = chooseE(totient)
 
     # compute d, 1 < d < totient such that e*d = 1 (mod totient)
@@ -59,13 +59,5 @@ def generate_keys():
     else:
         d = x
 
-    # write the public keys n and e to a file
-    pubkey = str(e) + ", " + str(n)
-    pubkey_f = open('public.key', 'w')
-    pubkey_f.write(pubkey)
-    pubkey_f.close()
+    return(e, n, d)
 
-    privkey = str(n) + ", " + str(d)
-    privkey_f = open('private.key', 'w')
-    privkey_f.write(privkey)
-    privkey_f.close()   
