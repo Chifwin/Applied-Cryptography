@@ -1,13 +1,6 @@
 import random, math, sympy
 
 
-def generate_prime(min_values, max_values):
-    prime = random.randint(min_values, max_values)
-    while not sympy.isprime(prime):
-        prime = random.randint(min_values, max_values)
-    return prime
-
-
 def compute_d(a, b):
     """
     Performs the extended Euclidean algorithm
@@ -40,9 +33,9 @@ def generate_keys(min_value, max_value):
     """
 
     # choose two random prime numbers 
-    prime1, prime2 = generate_prime(min_value, max_value), generate_prime(min_value, max_value)
+    prime1, prime2 = sympy.randprime(min_value, max_value), sympy.randprime(min_value, max_value)
     while prime1 == prime2:
-        prime2 = generate_prime(min_value, max_value)
+        prime2 = sympy.randprime(min_value, max_value)
 
     # compute n, totient, e
     n = prime1 * prime2
