@@ -5,135 +5,128 @@ class RSA:
         pass
 
     def generate_prime(self, min_values, max_values):
-        prime = random.randint(min_values, max_values)
-        while not sympy.isprime(prime):
-            prime = random.randint(min_values, max_values)
-        return prime
-
-
-    def compute_d(self, a, b):
-        """
-        Performs the extended Euclidean algorithm
-        Returns the gcd, coefficient of a, and coefficient of b
-        """
-        if a == 0:
-            return b, 0, 1
-        else:
-            gcd, x, y = self.compute_d(b % a, a)
-            return gcd, y - (b // a) * x, x
-
-
-    def chooseE(self, totient):
-        """
-        Chooses a random number, 1 < e < totient, and checks whether or not it is 
-        coprime with the totient, that is, gcd(e, totient) = 1
-        """
-        while (True):
-            e = random.randrange(2, totient)
-
-            if (math.gcd(e, totient) == 1):
-                return e
-
-
-    def generate_keys(self):
-        """
-        Using the prime numbers compute and store 
-        the public and private keys in two separate 
-        files.
-        """
-        # choose two random prime numbers 
-        prime1, prime2 = self.generate_prime(1000, 5000), self.generate_prime(1000, 5000)
+        prime1 = sympy.randprime(min_values, max_values)
+        prime2 = sympy.randprime(min_values, max_values)
         while prime1 == prime2:
-            prime2 = self.generate_prime(1000, 5000)
+            prime2 = sympy.randprime(1000, 5000) # -
+        return prime1, prime2
 
-        # compute n, totient, e
-        n = prime1 * prime2
-        totient = (prime1 - 1) * (prime2 - 1)
-        e = self.chooseE(totient)
+    def choose_e(self, p, q):
+        phi_n = (p-1) * (q-1)
+        e = random.randint(3, phi_n-1)
+        while math.gcd(e, phi_n) != 1:
+            e = random.randint(3, phi_n - 1)
+        return e
 
-        # compute d, 1 < d < totient such that e*d = 1 (mod totient)
-        # e and d are inverses (mod totient)
-        gcd, x, y = self.compute_d(e, totient)
+    def mod_inverse(self, e, phi):
+        for d in range(3, phi):
+            if (d * e) % phi == 1:
+                return d
+        raise ValueError("mod_inverse does not exist") #algorithm evklida
 
-        # make sure d is positive
-        if (x < 0):
-            d = x + totient
-        else:
-            d = x
 
-        # write the public keys n and e to a file
-        pubkey = str(e) + ", " + str(n)
-        pubkey_f = open('public.key', 'w')
-        pubkey_f.write(pubkey)
-        pubkey_f.close()
+    def generate_key(self):
+        # print("Generating keys...")
+        p, q = self.generate_prime(1000, 5000)
+        n = p * q
+        phi_n = (p-1) * (q-1)
+        e = self.choose_e(p, q)
+        d = self.mod_inverse(e, phi_n)
+        # print("Done!")
+        # save(e, n, d)
 
-        privkey = str(n) + ", " + str(d)
-        privkey_f = open('private.key', 'w')
-        privkey_f.write(privkey)
-        privkey_f.close()    
+        return e, n, d
+                    
 
+    def encrypt(self, plaintext, e, n):
+        message_encoded = [ch for ch in plaintext]
+        ciphertext = [pow(ch, e, n) for ch in message_encoded]
+        return ciphertext
+
+
+    def decrypt(self, ciphertext, n, d):
+        message_encoded = [pow(ch, d, n) for ch in ciphertext]
+        message = bytes(message_encoded)
+        return message
+
+
+# Create an instance of the DSA class and call the main method
+rsa = RSA()
+
+def save(self, e, n, d):
+    pubkey = str(e) + ", " + str(n)
+    pubkey_f = open('public.key', 'w')
+    pubkey_f.write(pubkey)
+    pubkey_f.close()
+
+    privkey = str(n) + ", " + str(d)
+    privkey_f = open('private.key', 'w')
+    privkey_f.write(privkey)
+    privkey_f.close()
+
+def main():
+    choise = input("What do you want? (enc/dec/gen) ")
+    if choise == "gen":
+        print("...Generating...")
         
-    def encrypt(self, from_path, pubkey_path, to_path):
-        fp = open(from_path, 'rb')
-        plaintext = fp.read()
-        fp.close()
+        e, n, d = rsa.generate_key() 
+        save(e, n, d)
+        # wtire here to save values
+        print("Done!")
 
-        pubkey_f = open(pubkey_path, 'r')
+    elif choise == "enc":
+        from_path = input("Enter the path to the file to encrypt: ")
+        to_path = input("Enter the path to the file to save: ")
+        try:
+            fp = open(from_path, 'rb')
+            plaintext = fp.read()
+            fp.close()
+        except:
+            plaintext = from_path.encode()
+
+        print("...Encrypting...")
+        pubkey_f = open("public.key", 'r')
         pub = pubkey_f.read().split(", ")
         pubkey_f.close()
 
         e = int(pub[0])
         n = int(pub[1])
-        message_encoded = [ch for ch in plaintext]
-        ciphertext = [pow(ch, e, n) for ch in message_encoded]
+        ciphertext = rsa.encrypt(plaintext, e, n)
+        # ciphertext = encrypt(plaintext, "public.key")
 
         tp = open(to_path, 'w')
         tp.write(str(ciphertext))
         tp.close()
-        return ciphertext
 
-    def decrypt(self, from_path, privkey_path, to_path):
-        fp = open(from_path, 'r')
-        ciphertext = [eval(i) for i in fp.read()[1:-1].split(", ")]
-        fp.close()
+        print("Done!")
 
-        privkey_f = open(privkey_path, 'r')
+    elif choise == "dec":
+        from_path = input("Enter the path to encrypted file: ")
+        to_path = input("Enter the path to the file to save: ")
+        try:
+            fp = open(from_path, 'r')
+            ciphertext = [int(i) for i in fp.read()[1:-1].split(", ")]
+            fp.close()
+        except:
+            ciphertext = [int(i) for i in from_path[1:-1].split(", ")]
+
+        print("...Decrypting...")
+        privkey_f = open("private.key", 'r')
         priv = privkey_f.read().split(", ")
         privkey_f.close()
 
         n = int(priv[0])
         d = int(priv[1])
-        message_encoded = [pow(ch, d, n) for ch in ciphertext]
-        message = bytes(message_encoded)
-        #message ="".join(chr(ch) for ch in message_encoded)
+        plaintext = rsa.decrypt(ciphertext, n, d)
+        # plaintext = decrypt(ciphertext, "private.key")
+
         tp = open(to_path, 'wb')
-        tp.write(message)
+        tp.write(plaintext)
         tp.close()
-        return message
 
-    def main(self):
-        choise = input("What do you want? (enc/dec/gen) ")
-        if choise == "gen":
-            print("...Generating...")
-            self.generate_keys()
-            print("Done!")
-        elif choise == "enc":
-            from_path = input("Enter the path to the file to encrypt: ")
-            pubkey_path = input("Enter the path to key file: ")
-            to_path = input("Enter the path to the file to save: ")
-            print("...Encrypting...")
-            self.encrypt(from_path, pubkey_path, to_path)
-            print("Done!")
-        elif choise == "dec":
-            from_path = input("Enter the path to encrypted file: ")
-            privkey_path = input("Enter the path to key file: ")
-            to_path = input("Enter the path to the file to save: ")
-            print("...Decrypting...")
-            self.decrypt(from_path, privkey_path, to_path)
-            print("Done!")
-        else:
-            print("!!!!Incorrect Input!!!!")
+        print("Done!")
 
-# Create an instance of the DSA class and call the main method
-dsa_instance = RSA()
-dsa_instance.main()
+    else:
+        print("!!!!Incorrect Input!!!!")
+
+main()
