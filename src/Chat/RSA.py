@@ -1,7 +1,7 @@
 import random, math, sympy
 
 class RSA:
-    def __init__(self, n, d=None, e=None):
+    def __init__(self, n, e=None, d=None):
         '''
             n = RSA modulus 
             d = private key
@@ -61,7 +61,7 @@ class RSA:
     def decrypt(self, ciphertext: bytes):
         if self.d == None:
             raise RuntimeError("Public key is unspecified")
-        # split bytes in segmnets, each of lenght RSA modulus
+        # split bytes in segments, each of length of RSA modulus
         splitted = (ciphertext[i:i+self.len_n()] for i in range(0, len(ciphertext), self.len_n()))
         ints = (int.from_bytes(x, "big") for x in splitted) # convert to ints
         return bytes(pow(x, self.d, self.n) for x in ints) # decrypt

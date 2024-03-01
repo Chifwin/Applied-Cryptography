@@ -1,4 +1,8 @@
 from AES_lib import *
+from RSA import RSA
+
+RSA_KEY_LEN = 512
+RSA_MOD_LEN = RSA_KEY_LEN * 2
 
 class Client:
     def __init__(self, key, sock):
@@ -41,12 +45,20 @@ class Client:
         self.sock.close()
 
     def key_exchange(self):
-        self.sock.send(bytes(i for i in self.key))
+        '''
+            Recieve public key, encrypt AES key and send it
+        '''
+        n = int.from_bytes(self.sock.recv(RSA_MOD_LEN), "big")
+        e = int.from_bytes(self.sock.recv(RSA_MOD_LEN), "big")
+        byte_key = bytes(i for i in self.key)
+        self.sock.send(RSA(n, e=e).encrypt(byte_key))
 
     @staticmethod
-    def get_key(sock):
+    def get_key(sock, n: int, e: int, d: int):
         '''
-            Return key from recieved bytes
+            Send public key, recieve encrypted AES key and decrypt it
         '''
-        key = sock.recv(1024)
+        sock.send(n.to_bytes(RSA_MOD_LEN, "big"))
+        sock.send(e.to_bytes(RSA_MOD_LEN, "big"))
+        key = RSA(n, e=e, d=d).decrypt(sock.recv(AES_KEY_LEN * RSA_MOD_LEN))
         return gen_key([*key])
