@@ -4,10 +4,7 @@ import socket
 import threading
 from sys import argv
 
-from client import Client, RSA_KEY_LEN
-from RSA import RSA
-
-rsa_keys = RSA.generate_key(RSA_KEY_LEN)
+from client import Client
 
 stop = False
 
@@ -47,7 +44,7 @@ if len(sys.argv) > 2:
 sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 sock.connect(tuple(server_sock))
 
-key = Client.get_key(sock, *rsa_keys)
+key = Client.get_key(sock)
 
 server = Client(key, sock)
 server.send(nickname)

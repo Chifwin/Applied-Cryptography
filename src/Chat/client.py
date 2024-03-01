@@ -54,10 +54,11 @@ class Client:
         self.sock.send(RSA(n, e=e).encrypt(byte_key))
 
     @staticmethod
-    def get_key(sock, n: int, e: int, d: int):
+    def get_key(sock):
         '''
             Send public key, recieve encrypted AES key and decrypt it
         '''
+        n, e, d = RSA.generate_key(RSA_KEY_LEN)
         sock.send(n.to_bytes(RSA_MOD_LEN, "big"))
         sock.send(e.to_bytes(RSA_MOD_LEN, "big"))
         key = RSA(n, e=e, d=d).decrypt(sock.recv(AES_KEY_LEN * RSA_MOD_LEN))
