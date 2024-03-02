@@ -160,7 +160,37 @@ namespace AES {
 
     static_assert(check_S_box());
 
-    template<int Nk, int Nr, int Nb=4>
+    template<class State>
+    class ECB{
+    public:
+        ECB(const State& iv){}
+        void encrypt(State& block, const State keys[]){
+            block.encrypt(keys);
+        }
+        void decrypt(State& block, const State keys[]){
+            block.decrypt(keys);
+        }
+    };
+
+    template<class State>
+    class CBC{
+        State internal;
+    public:
+        CBC(const State& iv){ internal = iv; }
+        void encrypt(State& block, const State keys[]){
+            block ^= internal;
+            block.encrypt(keys);
+            internal = block;
+        }
+        void decrypt(State& block, const State keys[]){
+            State new_internal = block;
+            block.decrypt(keys);
+            block ^= internal;
+            internal = new_internal;
+        }
+    };
+
+    template<int Nk, int Nr, int Nb=4, template<class S, class... K> class Mode=CBC>
     class Rijndael{
         /*
             Nb - number of 32-bit words in state
@@ -175,7 +205,10 @@ namespace AES {
         struct State{
             Matrix state;
 
-            State(std::vector<unsigned char>::const_iterator it){
+            State(): state{} {}
+
+            template<class Iter>
+            State(Iter it){
                 for(int j = 0; j < Nb; j++){ // column-wise matrix, so changed order of iterations
                     for(int i = 0; i < BLOCK_SIDE; i++){
                         state[i][j] = *(it++);
@@ -209,15 +242,20 @@ namespace AES {
                 }
                 state = res;
             }
-            
-            void add_round_key(const Matrix& round_key){
+
+            State& operator^=(const State& x){
                 for(int i = 0; i < BLOCK_SIDE; i++){
                     for(int j = 0; j < Nb; j++){
-                        state[i][j] += round_key[i][j];
+                        state[i][j] += x.state[i][j];
                     }
                 }
+                return *this;
             }
-        
+
+            void add_round_key(const State& key){
+                *this ^= key;
+            }
+
             void copy_to(std::vector<unsigned char>::iterator it){
                 for(int j = 0; j < Nb; j++){ // column-wise matrix, so changed order of iterations
                     for(int i = 0; i < BLOCK_SIDE; i++){
@@ -226,7 +264,7 @@ namespace AES {
                 }
             }
         
-            void encrypt_block(Matrix round_keys[Nr+1]){
+            void encrypt(const State round_keys[Nr+1]){
                 // Round 0
                 add_round_key(round_keys[0]);
                 // Round 1...Nr
@@ -238,7 +276,7 @@ namespace AES {
                 }
             }
 
-            void decrypt_block(Matrix round_keys[Nr+1]){
+            void decrypt(const State round_keys[Nr+1]){
                 //Round Nr
                 add_round_key(round_keys[Nr]);
                 // Round Nr-1 to 1
@@ -255,7 +293,8 @@ namespace AES {
             }
         };
         
-        Matrix round_keys[Nr+1];
+        State round_keys[Nr+1];
+        std::array<unsigned char, BLOCK_LEN> iv;
 
         void key_expansion(const std::array<unsigned char, KEY_LEN>& in_key){
             std::array<Poly, (Nr + 1) * BLOCK_LEN> w;
@@ -291,19 +330,15 @@ namespace AES {
                 }
             }
             for(int k = 0; k <= Nr; k++){
-                for(int i = 0; i < BLOCK_SIDE; i++){
-                    for(int j = 0; j < Nb; j++){
-                        // bytes in keys arranged in column order
-                        round_keys[k][i][j] = w[k*BLOCK_LEN + i + j*BLOCK_SIDE];
-                    }
-                }
+                round_keys[k] = State(w.begin() + k*BLOCK_LEN);
             }
         }
 
     public:
-        Rijndael(const std::array<unsigned char, Nk*4>& in_key){
+        Rijndael(const std::array<unsigned char, KEY_LEN>& in_key, const std::array<unsigned char, BLOCK_LEN>& iv_init={}){
             static_assert(Nk == 4 || Nk == 6 || Nk == 8);
             key_expansion(in_key);
+            iv = iv_init;
         }
 
         std::vector<unsigned char> encrypt(const std::vector<unsigned char>& data){
@@ -313,9 +348,11 @@ namespace AES {
             std::vector<unsigned char> res(res_len, res_len - data.size());
             std::copy(data.begin(), data.end(), res.begin());
 
+            Mode<State> enc_mode(iv.begin());
+
             for(auto it = res.begin(); it != res.end(); it += BLOCK_LEN){
                 State state(it);
-                state.encrypt_block(round_keys);
+                enc_mode.encrypt(state, round_keys);
                 state.copy_to(it);
             }
             return res;
@@ -325,10 +362,12 @@ namespace AES {
             const size_t n_block = (data.size() + BLOCK_LEN - 1) / BLOCK_LEN; // ceil division
             std::vector<unsigned char> res(n_block * BLOCK_LEN, 0);
             std::copy(data.begin(), data.end(), res.begin());
+            
+            Mode<State> dec_mode(iv.begin());
 
             for(auto it = res.begin(); it != res.end(); it += BLOCK_LEN){
                 State state(it);
-                state.decrypt_block(round_keys);
+                dec_mode.decrypt(state, round_keys);
                 state.copy_to(it);
             }
             // As we use PKCS#7, we know lenght of padding - value of last byte
