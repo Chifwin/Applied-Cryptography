@@ -49,6 +49,7 @@ class RSA:
             cur_gcd, d, _ = RSA.extgcd(e, phi)
             if cur_gcd == 1:
                 break
+        d = (d%phi + phi)%phi
         return (n, e, d)
 
     def encrypt(self, plaintext: bytes):
