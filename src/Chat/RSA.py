@@ -31,8 +31,8 @@ class RSA:
             Generate keys for RSA. Each prime in range (sqrt(2^key_len), 2^key_len)
             Return tuple (n, e, d), where (n, e) is public key, (n, d) - private
         '''
-        lower_bound = 2**(key_len//2)
-        upper_bound = 2**key_len
+        lower_bound = 2**(key_len//4)
+        upper_bound = 2**(key_len//2)
         gen_prime = lambda: sympy.randprime(lower_bound, upper_bound)
 
         p = gen_prime()
