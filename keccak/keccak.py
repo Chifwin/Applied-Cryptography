@@ -11,7 +11,7 @@
 def ROL64(a, n):
     return ((a >> (64-(n%64))) + (a << (n%64))) % (1 << 64)
 
-def KeccakF1600onLanes(lanes):
+def KeccakF1600onLanes(lanes, laneSize):
     R = 1
     for round in range(24):
         # θ
@@ -31,10 +31,11 @@ def KeccakF1600onLanes(lanes):
                 lanes[x][y] = T[x] ^((~T[(x+1)%5]) & T[(x+2)%5])
         # ι
         for j in range(7):
-            R = ((R << 1) ^ ((R >> 7)*0x71)) % 256
+            R = ((R << 1) ^ ((R >> 7)*0x71)) % (1 << laneSize)
             if (R & 2):
                 lanes[0][0] = lanes[0][0] ^ (1 << ((1<<j)-1))
     return lanes
+
 
 def load64(b):
     return sum((b[i] << (8*i)) for i in range(8))
@@ -45,13 +46,15 @@ def store64(a):
 def KeccakF(state, stateSizeBits):
     rate = stateSizeBits // 25
     capacity = stateSizeBits - 2 * rate
+    laneSize = rate // 5
     lanes = [state[i*8:i*8+8] for i in range(len(state)//8)]  # Разбиваем состояние на линии
-    lanes = KeccakF1600onLanes(lanes)
+    lanes = KeccakF1600onLanes(lanes, laneSize)
     state = bytearray(stateSizeBits // 8)
     for x in range(5):
         for y in range(5):
-            state[x*8+y*40:x*8+y*40+8] = store64(lanes[x][y])
+            state[x*8+y*laneSize*5:x*8+y*laneSize*5+laneSize] = store64(lanes[x][y])
     return state
+
 
 def Keccak(rate, capacity, inputBytes, delimitedSuffix, outputByteLen):
     outputBytes = bytearray()
