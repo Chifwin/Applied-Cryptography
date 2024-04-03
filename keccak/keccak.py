@@ -42,18 +42,20 @@ def load64(b):
 def store64(a):
     return list((a >> (8*i)) % 256 for i in range(8))
 
-def KeccakF1600(state):
-    lanes = [[load64(state[8*(x+5*y):8*(x+5*y)+8]) for y in range(5)] for x in range(5)]
+def KeccakF(state, stateSizeBits):
+    rate = stateSizeBits // 25
+    capacity = stateSizeBits - 2 * rate
+    lanes = [state[i*8:i*8+8] for i in range(len(state)//8)]  # Разбиваем состояние на линии
     lanes = KeccakF1600onLanes(lanes)
-    state = bytearray(200)
+    state = bytearray(stateSizeBits // 8)
     for x in range(5):
         for y in range(5):
-            state[8*(x+5*y):8*(x+5*y)+8] = store64(lanes[x][y])
+            state[x*8+y*40:x*8+y*40+8] = store64(lanes[x][y])
     return state
 
 def Keccak(rate, capacity, inputBytes, delimitedSuffix, outputByteLen):
     outputBytes = bytearray()
-    state = bytearray([0 for i in range(rate // 8)])  # Инициализируем состояние с учетом размера rate
+    state = bytearray([0 for i in range((rate + capacity) // 8)])  # Инициализируем состояние с учетом размера rate и capacity
     blockSize = 0
     if (((rate + capacity) % 8) != 0):
         return
@@ -65,23 +67,22 @@ def Keccak(rate, capacity, inputBytes, delimitedSuffix, outputByteLen):
             state[i] = state[i] ^ inputBytes[i+inputOffset]
         inputOffset = inputOffset + blockSize
         if (blockSize == rate//8):
-            state = KeccakF1600(state)
+            state = KeccakF(state, rate + capacity)  # Используем общую функцию KeccakF
             blockSize = 0
     # === Do the padding and switch to the squeezing phase ===
     state[blockSize] = state[blockSize] ^ delimitedSuffix
     if (((delimitedSuffix & 0x80) != 0) and (blockSize == (rate//8-1))):
-        state = KeccakF1600(state)
+        state = KeccakF(state, rate + capacity)  # Используем общую функцию KeccakF
     state[rate//8-1] = state[rate//8-1] ^ 0x80
-    state = KeccakF1600(state)
+    state = KeccakF(state, rate + capacity)  # Используем общую функцию KeccakF
     # === Squeeze out all the output blocks ===
     while(outputByteLen > 0):
         blockSize = min(outputByteLen, rate//8)
         outputBytes.extend(state[:blockSize])  # Используем метод extend для добавления элементов в выходной буфер
         outputByteLen = outputByteLen - blockSize
         if (outputByteLen > 0):
-            state = KeccakF1600(state)
+            state = KeccakF(state, rate + capacity)  # Используем общую функцию KeccakF
     return outputBytes
-
 
 def SHAKE128(inputBytes, outputByteLen):
     return Keccak(1344, 256, inputBytes, 0x1F, outputByteLen)
