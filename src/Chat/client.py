@@ -1,5 +1,6 @@
 from AES_lib import *
 from RSA import RSA
+from keccak import keccak
 
 RSA_KEY_LEN = 512
 
@@ -20,13 +21,20 @@ class Client:
             Encrypt string, using key of client. Lenght of the message is placed before chifertext
         '''
         sb = bytes(text, 'utf-8')
-        return self.aes.encrypt(sb)
+        hash_value = bytes(keccak.sha3_256(sb))
+        new_value = sb + hash_value
+        return self.aes.encrypt(new_value)
+        # return self.aes.encrypt(sb)
     
     def decrypt(self, sb: bytes):
         '''
             Decrypt bytes, using key of client, and getting lenght from start of the message
         '''
-        return str(self.aes.decrypt(sb), 'utf-8')
+        # return str(self.aes.decrypt(sb), 'utf-8')
+        if bytes(keccak.sha3_256(sb[:-32])) == sb[-32:]:
+            return str(self.aes.decrypt(sb[:-32]), 'utf-8')
+        else:
+            return "The message was changed during transmission! For security reasons, the message can not be decrypted."
     
     def send(self, text):
         '''
