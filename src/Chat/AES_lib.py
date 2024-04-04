@@ -3,7 +3,10 @@ import ctypes as C
 from random import randint
 
 
-lib = C.CDLL('.\\AES_lib.dll', winmode=0x8)
+try:
+    lib = C.CDLL('.\\AES_lib.dll', winmode=0x8)
+except FileNotFoundError:
+    lib = C.CDLL('.\\src\\Chat\\AES_lib.dll', winmode=0x8)
 
 AES_KEY_LEN = 16
 AES_BLOCK_LEN = 16
