@@ -1,6 +1,6 @@
 from AES_lib import *
 from RSA import RSA
-from keccak import keccak
+from keccak import *
 
 RSA_KEY_LEN = 512
 
