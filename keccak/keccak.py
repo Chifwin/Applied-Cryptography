@@ -27,19 +27,19 @@ def keccak_f_1600_on_lanes(lanes):
     return lanes
 
 def keccak_f_1600(state):
-    lanes = [[int.from_bytes(state[8 * (x + 5 * y):8 * (x + 5 * y) + 8], 'big') for y in range(5)] for x in range(5)]
+    lanes = [[int.from_bytes(state[8 * (x + 5 * y):8 * (x + 5 * y) + 8], 'little') for y in range(5)] for x in range(5)]
     lanes = keccak_f_1600_on_lanes(lanes)
     state = bytearray(200)
     for x in range(5):
         for y in range(5):
-            state[8 * (x + 5 * y):8 * (x + 5 * y) + 8] = int.to_bytes(lanes[x][y], 8, 'big')
+            state[8 * (x + 5 * y):8 * (x + 5 * y) + 8] = int.to_bytes(lanes[x][y], 8, 'little')
     return state
 
 def keccak(rate, capacity, input_bytes, delimited_suffix, output_byte_len):
     output_bytes = bytearray()
     state = bytearray([0] * 200)
     rate_in_bytes = rate // 8
-    #block_size = 0
+    block_size = 0
     if (rate + capacity) != 1600 or (rate % 8) != 0:
         return
     input_offset = 0
@@ -51,7 +51,7 @@ def keccak(rate, capacity, input_bytes, delimited_suffix, output_byte_len):
         input_offset += block_size
         if block_size == rate_in_bytes:
             state = keccak_f_1600(state)
-            #block_size = 0
+            block_size = 0
     # Do the padding and switch to the squeezing phase
     state[block_size] ^= delimited_suffix
     if (delimited_suffix & 0x80) != 0 and block_size == (rate_in_bytes - 1):
