@@ -1,46 +1,48 @@
-def ROL64(a, n):
-    return ((a >> (64 - (n % 64))) + (a << (n % 64))) % (1 << 64)
+def ROL(a, n, bit_length):
+    return ((a >> (bit_length - (n % bit_length))) + (a << (n % bit_length))) % (1 << bit_length)
 
-def keccak_f_1600_on_lanes(lanes):
-    R = 1
-    for _ in range(24):
+def keccak_f_on_lanes(lanes, bit_length, rounds):
+    lane_count = len(lanes)
+    for _ in range(rounds):
         # θ
-        C = [lanes[x][0] ^ lanes[x][1] ^ lanes[x][2] ^ lanes[x][3] ^ lanes[x][4] for x in range(5)]
-        D = [C[(x + 4) % 5] ^ ROL64(C[(x + 1) % 5], 1) for x in range(5)]
-        lanes = [[lanes[x][y] ^ D[x] for y in range(5)] for x in range(5)]
+        C = [lanes[x][0] ^ lanes[x][1] ^ lanes[x][2] ^ lanes[x][3] ^ lanes[x][4] for x in range(lane_count)]
+        D = [C[(x + 4) % lane_count] ^ ROL(C[(x + 1) % lane_count], 1, bit_length) for x in range(lane_count)]
+        lanes = [[lanes[x][y] ^ D[x] for y in range(lane_count)] for x in range(lane_count)]
         # ρ and π
         (x, y) = (1, 0)
         current = lanes[x][y]
         for t in range(24):
-            (x, y) = (y, (2 * x + 3 * y) % 5)
-            (current, lanes[x][y]) = (lanes[x][y], ROL64(current, (t + 1) * (t + 2) // 2))
+            (x, y) = (y, (2 * x + 3 * y) % lane_count)
+            (current, lanes[x][y]) = (lanes[x][y], ROL(current, (t + 1) * (t + 2) // 2, bit_length))
         # χ
-        for y in range(5):
-            T = [lanes[x][y] for x in range(5)]
-            for x in range(5):
-                lanes[x][y] = T[x] ^ ((~T[(x + 1) % 5]) & T[(x + 2) % 5])
+        for y in range(lane_count):
+            T = [lanes[x][y] for x in range(lane_count)]
+            for x in range(lane_count):
+                lanes[x][y] = T[x] ^ ((~T[(x + 1) % lane_count]) & T[(x + 2) % lane_count])
         # ι
+        R = 1
         for j in range(7):
-            R = ((R << 1) ^ ((R >> 7) * 0x71)) % 256
+            R = ((R << 1) ^ ((R >> (bit_length - 1)) * 0x71)) % (1 << bit_length)
             if R & 2:
                 lanes[0][0] ^= (1 << ((1 << j) - 1))
     return lanes
 
-def keccak_f_1600(state):
-    lanes = [[int.from_bytes(state[8 * (x + 5 * y):8 * (x + 5 * y) + 8], 'little') for y in range(5)] for x in range(5)]
-    lanes = keccak_f_1600_on_lanes(lanes)
-    state = bytearray(200)
-    for x in range(5):
-        for y in range(5):
-            state[8 * (x + 5 * y):8 * (x + 5 * y) + 8] = int.to_bytes(lanes[x][y], 8, 'little')
+def keccak_f(state, bit_length, rounds):
+    lane_count = len(state) * 8 // bit_length
+    lanes = [[int.from_bytes(state[bit_length // 8 * (x + lane_count * y):bit_length // 8 * (x + lane_count * y) + bit_length // 8], 'little') for y in range(lane_count)] for x in range(lane_count)]
+    lanes = keccak_f_on_lanes(lanes, bit_length, rounds)
+    state = bytearray(lane_count * lane_count * bit_length // 8)
+    for x in range(lane_count):
+        for y in range(lane_count):
+            state[bit_length // 8 * (x + lane_count * y):bit_length // 8 * (x + lane_count * y) + bit_length // 8] = int.to_bytes(lanes[x][y], bit_length // 8, 'little')
     return state
 
-def keccak(rate, capacity, input_bytes, delimited_suffix, output_byte_len):
+def keccak(rate, capacity, input_bytes, delimited_suffix, output_byte_len, bit_length=1600, rounds=24):
     output_bytes = bytearray()
-    state = bytearray([0] * 200)
+    state = bytearray([0] * (bit_length // 8))
     rate_in_bytes = rate // 8
     block_size = 0
-    if (rate + capacity) != 1600 or (rate % 8) != 0:
+    if (rate + capacity) != bit_length or (rate % 8) != 0:
         return
     input_offset = 0
     # Absorb all the input blocks
@@ -50,43 +52,40 @@ def keccak(rate, capacity, input_bytes, delimited_suffix, output_byte_len):
             state[i] ^= input_bytes[i + input_offset]
         input_offset += block_size
         if block_size == rate_in_bytes:
-            state = keccak_f_1600(state)
+            state = keccak_f(state, bit_length, rounds)
             block_size = 0
     # Do the padding and switch to the squeezing phase
     state[block_size] ^= delimited_suffix
     if (delimited_suffix & 0x80) != 0 and block_size == (rate_in_bytes - 1):
-        state = keccak_f_1600(state)
+        state = keccak_f(state, bit_length, rounds)
     state[rate_in_bytes - 1] ^= 0x80
-    state = keccak_f_1600(state)
+    state = keccak_f(state, bit_length, rounds)
     # Squeeze out all the output blocks
     while output_byte_len > 0:
         block_size = min(output_byte_len, rate_in_bytes)
         output_bytes.extend(state[:block_size])
         output_byte_len -= block_size
         if output_byte_len > 0:
-            state = keccak_f_1600(state)
+            state = keccak_f(state, bit_length, rounds)
     return output_bytes
 
 def shake_128(input_bytes, output_byte_len):
-    return keccak(1344, 256, input_bytes, 0x1F, output_byte_len)
+    return keccak(1344, 256, input_bytes, 0x1F, output_byte_len, bit_length=1600, rounds=24)
 
 def shake_256(input_bytes, output_byte_len):
-    return keccak(1088, 512, input_bytes, 0x1F, output_byte_len)
+    return keccak(1088, 512, input_bytes, 0x1F, output_byte_len, bit_length=1600, rounds=24)
 
 def sha3_224(input_bytes):
-    return keccak(1152, 448, input_bytes, 0x06, 224 // 8)
+    return keccak(1152, 448, input_bytes, 0x06, 224 // 8, bit_length=1600, rounds=24)
 
 def sha3_256(input_bytes):
-    return keccak(1088, 512, input_bytes, 0x06, 256 // 8)
+    return keccak(1088, 512, input_bytes, 0x06, 256 // 8, bit_length=1600, rounds=24)
 
 def sha3_384(input_bytes):
-    return keccak(832, 768, input_bytes, 0x06, 384 // 8)
+    return keccak(832, 768, input_bytes, 0x06, 384 // 8, bit_length=1600, rounds=24)
 
 def sha3_512(input_bytes):
-    return keccak(576, 1024, input_bytes, 0x06, 512 // 8)
-
-
-
+    return keccak(576, 1024, input_bytes, 0x06, 512 // 8, bit_length=1600, rounds=24)
 
 def keccak_main():
     from_file = input("Choose file: ")
@@ -94,4 +93,3 @@ def keccak_main():
     fff = ff.read()
     return sha3_256(fff)
 
-print(hex(int.from_bytes(sha3_256(''.encode()), 'big')))
