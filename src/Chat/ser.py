@@ -4,14 +4,14 @@ import sys
 import time
 
 from AES_lib import gen_key
-from client import Client
+from client import Client, Q_Key_Exchange
 
 server_sock = ['0.0.0.0', 55555]
 
-if len(sys.argv) > 2:
-    server_sock[1] = sys.argv[1]
-if len(sys.argv) > 2:
-    server_sock[2] = int(sys.argv[2])
+# if len(sys.argv) > 2:
+#     server_sock[1] = sys.argv[1]
+# if len(sys.argv) > 2:
+#     server_sock[2] = int(sys.argv[2])
 
 # Starting Server
 server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -31,7 +31,6 @@ def broadcast(message, sender):
 
 # Handling Messages From encrypt
 def handle(client: Client):
-    client.key_exchange()
     client.set_nickname(client.recv())
     broadcast(f"{client.nick} was joined!", client)
     while not stop:
@@ -55,7 +54,13 @@ def receive():
         print(f"Connected with {address}")
 
         # create client with new key
-        client = Client(gen_key(), sock)
+        key = None
+        if '-q' in sys.argv:
+            key = Q_Key_Exchange(sock).do_alice_part()
+            client = Client(gen_key(key), sock)
+        else:
+            client = Client(gen_key(key), sock)
+            client.key_exchange()
         clients.append(client)
 
         # Start Handling Thread For Client

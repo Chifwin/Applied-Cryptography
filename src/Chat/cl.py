@@ -4,7 +4,8 @@ import socket
 import threading
 from sys import argv
 
-from client import Client
+from client import Client, Q_Key_Exchange
+from AES_lib import gen_key
 
 stop = False
 
@@ -35,16 +36,21 @@ nickname = input("Choose your nickname: ")
 
 server_sock = ['127.0.0.1', 55555]
 
-if len(sys.argv) > 2:
-    server_sock[1] = sys.argv[1]
-if len(sys.argv) > 2:
-    server_sock[2] = int(sys.argv[2])
+# if len(sys.argv) > 2:
+#     server_sock[1] = sys.argv[1]
+# if len(sys.argv) > 2:
+#     server_sock[2] = int(sys.argv[2])
 
 # Connecting To Server
 sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 sock.connect(tuple(server_sock))
 
-key = Client.get_key(sock)
+
+key = None
+if '-q' in sys.argv:
+    key = gen_key(Q_Key_Exchange(sock).do_bob_part())
+else:
+    key = Client.get_key(sock)
 
 server = Client(key, sock)
 server.send(nickname)
